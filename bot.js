@@ -72,7 +72,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
             { body: [
                     new SlashCommandBuilder()
                         .setName('newradio')
-                        .setDescription('Sets a new radio frequency in the predefined channel')
+                        .setDescription('Sets a new radio frequency in the predefined channel'),
                     new SlashCommandBuilder()
                         .setName('ping')
                         .setDescription('Shows the current bot ping to the API server and WebSocket')
