@@ -31,12 +31,32 @@ client.on('interactionCreate', async interaction => {
         const embed = new EmbedBuilder()
             .setTitle('New Radio')
             .setDescription(`New Radio Frequency: ${radioFrequency}`)
-            .setColor(0x00FF00);
+            .setColor(0x99FFFF);
 
         // Send embed to the channel by ID
         await radioChannel.send({ content: '@everyone', embeds: [embed] });
 
         await interaction.reply({ content: `New radio frequency set to ${radioFrequency}`, ephemeral: true });
+    }
+
+    if (commandName === 'ping') {
+        // Get the WebSocket ping
+        const ping = client.ws.ping;
+
+        // Get the API latency (time to respond to the interaction)
+        const apiLatencyStart = Date.now();
+        await interaction.deferReply();
+        const apiLatencyEnd = Date.now();
+        const apiLatency = apiLatencyEnd - apiLatencyStart;
+
+        // Create embed with ping details
+        const embed = new EmbedBuilder()
+            .setTitle('🏓 Pong!')
+            .setDescription(`**WebSocket Ping:** ${ping}ms\n**API Latency:** ${apiLatency}ms`)
+            .setColor(0x99FFFF);
+
+        // Send the embed in the same channel the command was run in
+        await interaction.editReply({ embeds: [embed] });
     }
 });
 
@@ -53,6 +73,9 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
                     new SlashCommandBuilder()
                         .setName('newradio')
                         .setDescription('Sets a new radio frequency in the predefined channel')
+                    new SlashCommandBuilder()
+                        .setName('ping')
+                        .setDescription('Shows the current bot ping to the API server and WebSocket')
                 ] },
         );
 
