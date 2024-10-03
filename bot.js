@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST, EmbedBuilder, ActivityType} = require('discord.js');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
@@ -7,6 +7,20 @@ const radioChannelID = '1202015979962376225'; // Replace with the channel ID
 
 client.once('ready', () => {
     console.log('Bot is online!');
+
+    // Set bot's status to appear online on a mobile device
+    client.user.setPresence({
+        status: 'dnd', // Status: online, idle, dnd, invisible
+        activities: [{
+            name: 'Fuck the Saints',
+            type: ActivityType.Streaming // or other activity types like Streaming, Listening, etc.
+        }],
+        afk: false,
+        shardId: [0] // Optional, depending on your setup
+    });
+
+    // Simulate mobile status (show as online on a phone)
+    client.user.setStatus('online'); // Set status to online
 });
 
 client.on('interactionCreate', async interaction => {
