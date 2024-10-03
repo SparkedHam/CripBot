@@ -4,7 +4,7 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('claimtokens')
-        .setDescription('Claim your daily tokens'),
+        .setDescription('Claim your hourly tokens'),
 
     async execute(interaction, connection) {
         const userId = interaction.user.id;
@@ -20,7 +20,7 @@ module.exports = {
                 });
             } else {
                 const lastClaim = results[0].last_claim ? moment(results[0].last_claim) : null;
-                const timeDifference = lastClaim ? moment().diff(lastClaim, 'hours') : 24;
+                const timeDifference = lastClaim ? moment().diff(lastClaim, 'hours') : 1;
 
                 if (timeDifference >= 24) {
                     connection.query('UPDATE users SET balance = balance + 5000, last_claim = ? WHERE id = ?', [currentTime, userId], (err) => {
@@ -28,7 +28,7 @@ module.exports = {
                         interaction.reply({ content: 'You have successfully claimed 5000 tokens!', ephemeral: true });
                     });
                 } else {
-                    interaction.reply({ content: 'You can only claim tokens once every 24 hours. Please try again later.', ephemeral: true });
+                    interaction.reply({ content: 'You can only claim tokens once every 1 hour. Please try again later.', ephemeral: true });
                 }
             }
         });
