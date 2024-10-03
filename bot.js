@@ -71,7 +71,8 @@ client.on('interactionCreate', async interaction => {
         }
 
         // Set the channel name
-        await radioChannel.setName(`📻・radio-${part1}-${part2 < 10 ? '0' + part2 : part2}`);
+        const [part1, part2] = radioFrequency.split('.');
+        await radioChannel.setName(`📻・radio-${part1}-${part2}`);
 
         // Create embed
         const embed = new EmbedBuilder()
