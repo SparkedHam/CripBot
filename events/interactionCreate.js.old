@@ -1,0 +1,256 @@
+const { EmbedBuilder } = require('discord.js');
+const { drawCards, calculateHand } = require('../utils/blackjack');
+
+module.exports = {
+    name: 'interactionCreate',
+    async execute(interaction, client, connection, gameState) {
+        const userId = interaction.user.id;
+
+        // Handle Slash Commands
+        if (interaction.isCommand()) {
+            const command = client.commands.get(interaction.commandName);
+
+            if (!command) return;
+
+            try {
+                // Pass connection to the command
+                await command.execute(interaction, connection, gameState, client);
+            } catch (error) {
+                console.error(error);
+                await interaction.reply({content: 'There was an error executing this command!', ephemeral: true});
+            }
+        }
+
+        // Handle Button Interactions (e.g., hit, stand, double in blackjack)
+        if (interaction.isButton()) {
+            const game = gameState[userId];
+
+            if (!game) {
+                return interaction.reply({content: 'You are not currently in a blackjack game.', ephemeral: true});
+            }
+
+            const {playerCards, dealerCards, bet, hasDoubled} = game;
+            const playerTotal = calculateHand(playerCards);
+            const dealerTotal = calculateHand(dealerCards);
+
+            // Check for dealer blackjack
+            if (dealerCards.length === 2 && dealerTotal === 21) {
+                connection.query('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId], (err) => {
+                    if (err) throw err;
+
+                    const embed = new EmbedBuilder()
+                        .setTitle('Dealer Blackjack')
+                        .setDescription(`Dealer got blackjack! Dealer's hand: ${dealerCards.join(', ')}. You lost ${bet} tokens.`)
+                        .setColor(0xFF0000);
+
+                    interaction.update({
+                        embeds: [embed],
+                        components: [] // Remove buttons
+                    });
+                    delete gameState[userId];
+                });
+
+                return;
+            }
+
+            // Handle player blackjack
+            if (playerCards.length === 2 && playerTotal === 21) {
+                const blackjackPayout = bet * 3;  // 3:1 payout for blackjack
+
+                connection.query('UPDATE users SET balance = balance + ? WHERE id = ?', [blackjackPayout, userId], (err) => {
+                    if (err) throw err;
+
+                    const embed = new EmbedBuilder()
+                        .setTitle('Blackjack!')
+                        .setDescription(`Blackjack! You won ${blackjackPayout} tokens! Your cards: ${playerCards.join(', ')}`)
+                        .setColor(0x00FF00);
+
+                    interaction.update({
+                        embeds: [embed],
+                        components: [] // Remove buttons
+                    });
+                    delete gameState[userId]; // End the game
+                });
+
+                return;
+            }
+
+            if (interaction.customId === 'stand' || interaction.customId === 'hit' || interaction.customId === 'double') {
+                const game = gameState[userId];
+
+                // Prevent further actions if the player already got blackjack
+                if (calculateHand(game.playerCards) === 21) {
+                    return interaction.reply({content: 'You already have blackjack!', ephemeral: true});
+                }
+
+                // Handle Double Down
+                if (interaction.customId === 'double') {
+                    // Defer the update to avoid timing out
+                    await interaction.deferUpdate();
+
+                    const game = gameState[userId];
+                    const { playerCards, bet, hasDoubled, userId } = game;
+
+                    if (playerCards.length !== 2 || hasDoubled) {
+                        return interaction.reply({ content: 'You can only double down on your first move.', ephemeral: true });
+                    }
+
+                    // Double the bet
+                    const doubledBet = bet * 2;
+                    gameState[userId].bet = doubledBet;
+                    gameState[userId].hasDoubled = true;
+
+                    // Deduct the second bet from the user's balance
+                    connection.query('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId], (err) => {
+                        if (err) {
+                            console.error('Error deducting double bet:', err);
+                            return interaction.editReply({ content: 'Error deducting double bet.', ephemeral: true });
+                        }
+                        console.log(`Doubled bet deducted from user ${userId}`);
+                    });
+
+                    // Player draws one more card
+                    const newCard = drawCards(1)[0];
+                    playerCards.push(newCard);
+                    const newPlayerTotal = calculateHand(playerCards);
+
+                    // Check if player busted after double down
+                    if (newPlayerTotal > 21) {
+                        connection.query('UPDATE users SET balance = balance - ? WHERE id = ?', [doubledBet, userId], (err) => {
+                            if (err) throw err;
+
+                            const embed = new EmbedBuilder()
+                                .setTitle('Blackjack')
+                                .setDescription(`You doubled down and drew a ${newCard}. Your hand: ${playerCards.join(', ')} (Total: ${newPlayerTotal}). You busted!`)
+                                .setColor(0xFF0000);
+
+                            // End the game and update the interaction
+                            interaction.editReply({ embeds: [embed], components: [] });
+                            delete gameState[userId];  // End the game
+                        });
+                    } else {
+                        // If the player didn't bust, process the dealer's turn
+                        await processDealerTurn(interaction, game, doubledBet, connection, gameState);
+                    }
+                }
+
+
+                // Handle Hit
+                if (interaction.customId === 'hit') {
+                    // Defer the update to avoid timing out
+                    await interaction.deferUpdate();
+
+                    const newCard = drawCards(1)[0];
+                    playerCards.push(newCard);
+                    const newPlayerTotal = calculateHand(playerCards);
+
+                    if (newPlayerTotal > 21) {
+                        // Player busted, update balance and inform the user
+                        connection.query('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId], (err) => {
+                            if (err) throw err;
+
+                            const embed = new EmbedBuilder()
+                                .setTitle('Blackjack')
+                                .setDescription(`You drew a ${newCard}. Your hand: ${playerCards.join(', ')} (Total: ${newPlayerTotal}). You busted!`)
+                                .setColor(0xFF0000);
+
+                            // Update the interaction after busting
+                            interaction.editReply({embeds: [embed], components: []});
+                            delete gameState[userId];  // End the game
+                        });
+                    } else {
+                        // Player hasn't busted, update the game state
+                        const embed = new EmbedBuilder()
+                            .setTitle('Blackjack')
+                            .setDescription(`Your cards: ${playerCards.join(', ')} (Total: ${newPlayerTotal})\nDealer's visible card: ${dealerCards[0]}`)
+                            .setColor(0x00FF00);
+
+                        // Update the interaction with the new state
+                        interaction.editReply({embeds: [embed], components: interaction.message.components});
+                    }
+                }
+
+                // Handle Stand
+                if (interaction.customId === 'stand') {
+                    // Defer the reply immediately to let Discord know we are processing
+                    await interaction.deferUpdate();
+
+                    // Process the dealer's turn and resolve the game
+                    await processDealerTurn(interaction, game, bet, connection, gameState);
+                }
+            }
+        }
+    }
+};
+
+/**
+ * Process the dealer's turn and resolve the game
+ */
+async function processDealerTurn(interaction, game, bet, connection, gameState) {
+    const { playerCards, dealerCards, userId } = game;
+    const playerTotal = calculateHand(playerCards);
+
+    // Dealer draws cards until their total is at least 17
+    while (calculateHand(dealerCards) < 17) {
+        dealerCards.push(drawCards(1)[0]);
+    }
+
+    const dealerTotal = calculateHand(dealerCards);
+
+    let result;
+    if (dealerTotal > 21 || playerTotal > dealerTotal) {
+        // Player wins - Add back the player's original bet + winnings
+        result = `You win! You gained ${bet} tokens.`;
+
+        // Add debug log to check the values
+        console.log(`Player wins. Adding ${bet * 2} tokens to the balance of user ${userId}`);
+
+        connection.query('UPDATE users SET balance = balance + ? WHERE id = ?', [bet * 2, userId], (err, results) => {
+            if (err) {
+                console.error('Error updating balance:', err);
+                return interaction.editReply({ content: 'Error updating balance.', ephemeral: true });
+            }
+            console.log(`Updated balance for user ${userId}:`, results);
+        });
+
+    } else if (playerTotal < dealerTotal) {
+        // Player loses - The balance is already updated earlier when the bet was deducted
+        if (gameState[userId].hasDoubled) {
+            result = `You lose! You lost ${bet * 2} tokens.`;
+        } else {
+            result = `You lose! You lost ${bet} tokens.`;
+        }
+
+        // No need to update the balance here since it was already deducted at the start.
+    } else {
+        // It's a push, return the original bet only
+        result = 'It\'s a push! Your bet has been returned.';
+
+        // Log and update the balance
+        console.log(`Push. Returning ${bet} tokens to the balance of user ${userId}`);
+
+        connection.query('UPDATE users SET balance = balance + ? WHERE id = ?', [bet, userId], (err, results) => {
+            if (err) {
+                console.error('Error updating balance:', err);
+                return interaction.editReply({ content: 'Error returning balance.', ephemeral: true });
+            }
+            console.log(`Returned bet for user ${userId}:`, results);
+        });
+    }
+
+    const embed = new EmbedBuilder()
+        .setTitle('Blackjack')
+        .setDescription(`Your cards: ${playerCards.join(', ')} (Total: ${playerTotal})\nDealer's cards: ${dealerCards.join(', ')} (Total: ${dealerTotal})\n${result}`)
+        .setColor(0x00FF00);
+
+    // Update the interaction with the result and remove the buttons
+    await interaction.editReply({ embeds: [embed], components: [] });
+
+    // Remove the game state for the user as the game has ended
+    delete gameState[userId];
+}
+
+
+
+
+
