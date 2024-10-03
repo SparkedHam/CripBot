@@ -110,7 +110,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         console.log('Started refreshing application (/) commands.');
 
         await rest.put(
-            Routes.applicationCommands('1291165127394983970'),
+            Routes.applicationCommands(process.env.APPLICATION_ID),
             { body: [
                     new SlashCommandBuilder()
                         .setName('newradio')
