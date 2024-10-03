@@ -3,8 +3,6 @@ const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST, EmbedBuild
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-const radioChannelID = '1202015979962376225'; // Replace with the channel ID
-
 client.once('ready', () => {
     console.log('Bot is online!');
 
@@ -30,7 +28,7 @@ client.on('interactionCreate', async interaction => {
     const { commandName } = interaction;
 
     if (commandName === 'newradio') {
-        const radioChannel = interaction.guild.channels.cache.get(radioChannelID);
+        const radioChannel = interaction.guild.channels.cache.get(process.env.RADIO_CHANNEL_ID);
 
         if (!radioChannel) return interaction.reply({ content: "Channel not found", ephemeral: true });
 
@@ -76,7 +74,7 @@ client.on('interactionCreate', async interaction => {
     }
     if (commandName === 'setradio') {
         const radioFrequency = interaction.options.getString('frequency');
-        const radioChannel = interaction.guild.channels.cache.get(radioChannelID);
+        const radioChannel = interaction.guild.channels.cache.get(process.env.RADIO_CHANNEL_ID);
 
         if (!radioChannel) return interaction.reply({ content: "Channel not found", ephemeral: true });
 
