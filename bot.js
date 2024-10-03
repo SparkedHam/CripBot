@@ -3,6 +3,8 @@ const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST, EmbedBuild
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+const radioChannelID = '1202015979962376225'; // Replace with the channel ID
+
 client.once('ready', () => {
     console.log('Bot is online!');
 });
@@ -13,9 +15,7 @@ client.on('interactionCreate', async interaction => {
     const { commandName } = interaction;
 
     if (commandName === 'newradio') {
-        const channelID = '1202015979962376225'; // Replace with the channel ID
-
-        const radioChannel = interaction.guild.channels.cache.get(channelID);
+        const radioChannel = interaction.guild.channels.cache.get(radioChannelID);
 
         if (!radioChannel) return interaction.reply({ content: "Channel not found", ephemeral: true });
 
@@ -58,6 +58,32 @@ client.on('interactionCreate', async interaction => {
         // Send the embed in the same channel the command was run in
         await interaction.editReply({ embeds: [embed] });
     }
+    if (commandName === 'setradio') {
+        const radioFrequency = interaction.options.getString('frequency');
+        const radioChannel = interaction.guild.channels.cache.get(radioChannelID);
+
+        if (!radioChannel) return interaction.reply({ content: "Channel not found", ephemeral: true });
+
+        // Ensure the radio frequency is in the correct format (e.g., 123.45)
+        const radioRegex = /^\d{2,3}\.\d{2}$/;
+        if (!radioRegex.test(radioFrequency)) {
+            return interaction.reply({ content: "Invalid radio frequency format. Please use the format XXX.XX.", ephemeral: true });
+        }
+
+        // Set the channel name
+        await radioChannel.setName(`📻・radio-${part1}-${part2 < 10 ? '0' + part2 : part2}`);
+
+        // Create embed
+        const embed = new EmbedBuilder()
+            .setTitle('Set Radio')
+            .setDescription(`Radio frequency set to: ${radioFrequency}`)
+            .setColor(0x99FFFF);
+
+        // Send embed to the channel
+        await radioChannel.send({ content: '@everyone', embeds: [embed] });
+
+        await interaction.reply({ content: `Radio frequency successfully set to ${radioFrequency}`, ephemeral: true });
+    }
 });
 
 // Register the slash command
@@ -72,10 +98,17 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
             { body: [
                     new SlashCommandBuilder()
                         .setName('newradio')
-                        .setDescription('Sets a new radio frequency in the predefined channel'),
+                        .setDescription('Automatically generates a new radio frequency'),
                     new SlashCommandBuilder()
                         .setName('ping')
-                        .setDescription('Shows the current bot ping to the API server and WebSocket')
+                        .setDescription('Shows the current bot ping to the API server and WebSocket'),
+                    new SlashCommandBuilder()
+                        .setName('setradio')
+                        .setDescription('Sets a custom radio frequency')
+                        .addStringOption(option =>
+                            option.setName('frequency')
+                                .setDescription('The radio frequency to set (e.g., 123.45)')
+                                .setRequired(true))
                 ] },
         );
 
