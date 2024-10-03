@@ -13,7 +13,7 @@ client.once('ready', () => {
         status: 'dnd', // Status: online, idle, dnd, invisible
         activities: [{
             name: 'Fuck the Saints',
-            type: ActivityType.Streaming // or other activity types like Streaming, Listening, etc.
+            type: ActivityType.Streaming, // or other activity types like Streaming, Listening, etc.
             url: 'https://youtu.be/dQw4w9WgXcQ?si=rVEdh9HDnU-ptso6'
         }],
         afk: false,
