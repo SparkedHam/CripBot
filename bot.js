@@ -1,137 +1,70 @@
+const fs = require('fs');
+const path = require('path');
+const { Client, Collection, GatewayIntentBits, ActivityType } = require('discord.js');
+const mysql = require('mysql2');
+const connection = require('./utils/mysql');
 require('dotenv').config();
-const { Client, GatewayIntentBits, SlashCommandBuilder, Routes, REST, EmbedBuilder, ActivityType} = require('discord.js');
+const gameState = {};
+
+console.log('Starting the bot...');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+client.commands = new Collection();
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
+// Load commands
+for (const file of commandFiles) {
+    const command = require(path.join(commandsPath, file));
+    if (command.data && command.execute) {
+        client.commands.set(command.data.name, command);
+        console.log(`Loaded command: ${command.data.name}`);
+    } else {
+        console.log(`[WARNING] The command in ${file} is missing required properties.`);
+    }
+}
+
+// Load event listeners
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+    const event = require(path.join(eventsPath, file));
+    if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args, client, connection, gameState)); // Pass the connection to event handler
+    } else {
+        client.on(event.name, (...args) => event.execute(...args, client, connection, gameState)); // Pass the connection to event handler
+    }
+    console.log(`Loaded event: ${event.name}`);
+}
+
+client.login(process.env.DISCORD_TOKEN).catch(error => {
+    console.error('Failed to login:', error);
+});
+
 client.once('ready', () => {
-    console.log('Bot is online!');
+    console.log('Bot is Ready & Online!');
 
     // Set bot's status to appear online on a mobile device
     client.user.setPresence({
         status: 'dnd', // Status: online, idle, dnd, invisible
         activities: [{
             name: 'Fuck the Saints',
-            type: ActivityType.Streaming, // or other activity types like Streaming, Listening, etc.
-            url: 'https://youtu.be/dQw4w9WgXcQ?si=rVEdh9HDnU-ptso6'
+            type: ActivityType.Watching, // Activity type
         }],
         afk: false,
         shardId: [0] // Optional, depending on your setup
     });
 
+    connection.query('SELECT 1 + 1 AS solution', (err, results) => {
+        if (err) {
+            console.error('Error executing test query:', err);
+        } else {
+            console.log('Test query result:', results[0].solution); // Should log '2'
+        }
+    });
+
     // Simulate mobile status (show as online on a phone)
     client.user.setStatus('online'); // Set status to online
 });
-
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isCommand()) return;
-
-    const { commandName } = interaction;
-
-    if (commandName === 'newradio') {
-        const radioChannel = interaction.guild.channels.cache.get(process.env.RADIO_CHANNEL_ID);
-
-        if (!radioChannel) return interaction.reply({ content: "Channel not found", ephemeral: true });
-
-        // Generate the radio number
-        const part1 = Math.floor(Math.random() * (999 - 20 + 1)) + 20;
-        const part2 = Math.floor(Math.random() * 100);
-        const radioFrequency = `${part1}.${part2 < 10 ? '0' + part2 : part2}`;
-
-        // Set new channel name
-        await radioChannel.setName(`📻・radio-${part1}-${part2}`);
-
-        // Create embed
-        const embed = new EmbedBuilder()
-            .setTitle('New Radio')
-            .setDescription(`New Radio Frequency: **${radioFrequency}**`)
-            .setColor(0x99FFFF)
-            .setFooter({ text: `Requested by: ${interaction.user.username}` });
-
-        // Send embed to the channel by ID
-        await radioChannel.send({ content: '@everyone', embeds: [embed] });
-
-        await interaction.reply({ content: `New radio frequency set to ${radioFrequency}`, ephemeral: true });
-    }
-
-    if (commandName === 'ping') {
-        // Get the WebSocket ping
-        const ping = client.ws.ping;
-
-        // Get the API latency (time to respond to the interaction)
-        const apiLatencyStart = Date.now();
-        await interaction.deferReply();
-        const apiLatencyEnd = Date.now();
-        const apiLatency = apiLatencyEnd - apiLatencyStart;
-
-        // Create embed with ping details
-        const embed = new EmbedBuilder()
-            .setTitle('🏓 Pong!')
-            .setDescription(`**WebSocket Ping:** ${ping}ms\n**API Latency:** ${apiLatency}ms`)
-            .setColor(0x99FFFF);
-
-        // Send the embed in the same channel the command was run in
-        await interaction.editReply({ embeds: [embed] });
-    }
-    if (commandName === 'setradio') {
-        const radioFrequency = interaction.options.getString('frequency');
-        const radioChannel = interaction.guild.channels.cache.get(process.env.RADIO_CHANNEL_ID);
-
-        if (!radioChannel) return interaction.reply({ content: "Channel not found", ephemeral: true });
-
-        // Ensure the radio frequency is in the correct format (e.g., 123.45)
-        const radioRegex = /^\d{2,3}\.\d{2}$/;
-        if (!radioRegex.test(radioFrequency)) {
-            return interaction.reply({ content: "Invalid radio frequency format. Please use the format XXX.XX.", ephemeral: true });
-        }
-
-        // Set the channel name
-        const [part1, part2] = radioFrequency.split('.');
-        await radioChannel.setName(`📻・radio-${part1}-${part2}`);
-
-        // Create embed
-        const embed = new EmbedBuilder()
-            .setTitle('Set Radio')
-            .setDescription(`Radio frequency set to: **${radioFrequency}**`)
-            .setColor(0x99FFFF)
-            .setFooter({ text: `Requested by: ${interaction.user.username}` });
-
-        // Send embed to the channel
-        await radioChannel.send({ content: '@everyone', embeds: [embed] });
-
-        await interaction.reply({ content: `Radio frequency successfully set to ${radioFrequency}`, ephemeral: true });
-    }
-});
-
-// Register the slash command
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-
-(async () => {
-    try {
-        console.log('Started refreshing application (/) commands.');
-
-        await rest.put(
-            Routes.applicationCommands(process.env.APPLICATION_ID),
-            { body: [
-                    new SlashCommandBuilder()
-                        .setName('newradio')
-                        .setDescription('Automatically generates a new radio frequency'),
-                    new SlashCommandBuilder()
-                        .setName('ping')
-                        .setDescription('Shows the current bot ping to the API server and WebSocket'),
-                    new SlashCommandBuilder()
-                        .setName('setradio')
-                        .setDescription('Sets a custom radio frequency')
-                        .addStringOption(option =>
-                            option.setName('frequency')
-                                .setDescription('The radio frequency to set (e.g., 123.45)')
-                                .setRequired(true))
-                ] },
-        );
-
-        console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
-    }
-})();
-
-client.login(process.env.DISCORD_TOKEN);
