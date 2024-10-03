@@ -45,8 +45,9 @@ client.on('interactionCreate', async interaction => {
         // Create embed
         const embed = new EmbedBuilder()
             .setTitle('New Radio')
-            .setDescription(`New Radio Frequency: ${radioFrequency}`)
-            .setColor(0x99FFFF);
+            .setDescription(`New Radio Frequency: **${radioFrequency}**`)
+            .setColor(0x99FFFF)
+            .setFooter({ text: `Requested by: ${interaction.user.username}` });
 
         // Send embed to the channel by ID
         await radioChannel.send({ content: '@everyone', embeds: [embed] });
@@ -92,8 +93,9 @@ client.on('interactionCreate', async interaction => {
         // Create embed
         const embed = new EmbedBuilder()
             .setTitle('Set Radio')
-            .setDescription(`Radio frequency set to: ${radioFrequency}`)
-            .setColor(0x99FFFF);
+            .setDescription(`Radio frequency set to: **${radioFrequency}**`)
+            .setColor(0x99FFFF)
+            .setFooter({ text: `Requested by: ${interaction.user.username}` });
 
         // Send embed to the channel
         await radioChannel.send({ content: '@everyone', embeds: [embed] });
