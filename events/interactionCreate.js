@@ -30,7 +30,6 @@ module.exports = {
             }
 
             const { playerCards, dealerCards, bet, hasDoubled } = game;
-            const playerTotal = calculateHand(playerCards);
 
             // Handle Double Down
             if (interaction.customId === 'double') {
