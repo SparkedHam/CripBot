@@ -11,7 +11,7 @@ module.exports = {
 
         if (!radioChannel) return interaction.reply({ content: 'Channel not found', ephemeral: true });
 
-        const part1 = Math.floor(Math.random() * (999 - 20 + 1)) + 20;
+        const part1 = Math.floor(Math.random() * (500 - 20 + 1)) + 20;
         const part2 = Math.floor(Math.random() * 100);
         const radioFrequency = `${part1}.${part2 < 10 ? '0' + part2 : part2}`;
 
