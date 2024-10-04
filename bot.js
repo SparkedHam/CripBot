@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, GatewayIntentBits, ActivityType } = require('discord.js');
-const mysql = require('mysql2');
 const connection = require('./utils/mysql');
 require('dotenv').config();
 const gameState = {};
