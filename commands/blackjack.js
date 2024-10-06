@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { drawCards, calculateHand } = require('../utils/blackjack');
+const pool = require('../utils/mysql');  // Import the pool
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,14 +11,13 @@ module.exports = {
                 .setDescription('Enter your bet amount')
                 .setRequired(true)),
 
-    async execute(interaction, connection, gameState) {
+    async execute(interaction, gameState) {
         const userId = interaction.user.id;
         const bet = interaction.options.getInteger('bet');
 
-        // Check if user has enough balance
-        connection.query('SELECT balance FROM users WHERE id = ?', [userId], (err, results) => {
-            if (err) throw err;
-
+        try {
+            // Check if the user has enough balance using async/await
+            const [results] = await pool.query('SELECT balance FROM users WHERE id = ?', [userId]);
             const balance = results[0]?.balance || 0;
 
             if (balance < bet) {
@@ -25,9 +25,7 @@ module.exports = {
             }
 
             // Deduct the bet from the user's balance
-            connection.query('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId], (err) => {
-                if (err) throw err;
-            });
+            await pool.query('UPDATE users SET balance = balance - ? WHERE id = ?', [bet, userId]);
 
             // Initialize the game
             const playerCards = drawCards(2);
@@ -39,20 +37,15 @@ module.exports = {
             if (playerTotal === 21) {
                 const blackjackPayout = bet * 3;  // 3:1 payout for blackjack
 
-                connection.query('UPDATE users SET balance = balance + ? WHERE id = ?', [blackjackPayout, userId], (err) => {
-                    if (err) throw err;
+                await pool.query('UPDATE users SET balance = balance + ? WHERE id = ?', [blackjackPayout, userId]);
 
-                    const embed = new EmbedBuilder()
-                        .setTitle('Blackjack!')
-                        .setDescription(`Blackjack! You won ${blackjackPayout} tokens! Your cards: ${playerCards.join(', ')}`)
-                        .setColor(0x00FF00);
+                const embed = new EmbedBuilder()
+                    .setTitle('Blackjack!')
+                    .setDescription(`Blackjack! You won ${blackjackPayout} tokens! Your cards: ${playerCards.join(', ')}`)
+                    .setColor(0x00FF00);
 
-                    // End the game immediately, no buttons needed
-                    return interaction.reply({ embeds: [embed], components: [] }); // No buttons as the game is over
-                });
-
-                // No need to proceed further if player gets blackjack
-                return;
+                // End the game immediately, no buttons needed
+                return interaction.reply({ embeds: [embed], components: [] });
             }
 
             // Save game state for the player
@@ -88,7 +81,11 @@ module.exports = {
                 );
 
             // Send the message with the embed and buttons
-            interaction.reply({ embeds: [embed], components: [buttons] });
-        });
+            await interaction.reply({ embeds: [embed], components: [buttons] });
+
+        } catch (err) {
+            console.error('Error during blackjack execution:', err);
+            return interaction.reply({ content: 'An error occurred while processing the game.', ephemeral: true });
+        }
     }
 };

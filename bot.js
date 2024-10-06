@@ -4,6 +4,7 @@ const { Client, Collection, GatewayIntentBits, ActivityType } = require('discord
 const connection = require('./utils/mysql');
 require('dotenv').config();
 const gameState = {};
+const pool = require('./utils/mysql');
 
 console.log('Starting the bot...');
 
@@ -56,13 +57,15 @@ client.once('ready', () => {
         shardId: [0] // Optional, depending on your setup
     });
 
-    connection.query('SELECT 1 + 1 AS solution', (err, results) => {
-        if (err) {
-            console.error('Error executing test query:', err);
-        } else {
-            console.log('Test query result:', results[0].solution); // Should log '2'
+    (async () => {
+        try {
+            // Example query using the pool
+            const [rows] = await pool.query('SELECT 1 + 1 AS solution');
+            console.log('Test query result:', rows[0].solution);  // This should log '2'
+        } catch (err) {
+            console.error('Database query failed:', err);
         }
-    });
+    })();
 
     // Simulate mobile status (show as online on a phone)
     client.user.setStatus('online'); // Set status to online
