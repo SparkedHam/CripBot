@@ -16,11 +16,14 @@ module.exports = {
 
     async execute(interaction) {
         const giverId = interaction.user.id;
+        const giverUsername = interaction.user.username;
         const recipient = interaction.options.getUser('recipient');
+        const recipientId = recipient.id;
+        const recipientUsername = recipient.username;
         const amount = interaction.options.getInteger('amount');
 
         // Prevent users from sending credits to themselves
-        if (giverId === recipient.id) {
+        if (giverId === recipientId) {
             return interaction.reply({ content: 'You cannot give credits to yourself.', ephemeral: true });
         }
 
@@ -33,15 +36,19 @@ module.exports = {
             }
 
             // Check if the recipient exists; if not, create their account
-            const [recipientResults] = await pool.query('SELECT * FROM users WHERE id = ?', [recipient.id]);
+            const [recipientResults] = await pool.query('SELECT * FROM users WHERE id = ?', [recipientId]);
             if (recipientResults.length === 0) {
-                await pool.query('INSERT INTO users (id, username, balance) VALUES (?, ?, ?)', [recipient.id, recipient.username, amount]);
+                await pool.query('INSERT INTO users (id, username, balance) VALUES (?, ?, ?)', [recipientId, recipientUsername, amount]);
             } else {
-                await pool.query('UPDATE users SET balance = balance + ? WHERE id = ?', [amount, recipient.id]);
+                await pool.query('UPDATE users SET balance = balance + ? WHERE id = ?', [amount, recipientId]);
             }
 
             // Deduct the amount from the giver's balance
             await pool.query('UPDATE users SET balance = balance - ? WHERE id = ?', [amount, giverId]);
+
+            // Log the transfer in the `transfers` table
+            await pool.query('INSERT INTO transfers (giver_id, giver_username, receiver_id, receiver_username, amount, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+                [giverId, giverUsername, recipientId, recipientUsername, amount, new Date()]);
 
             // Reply to confirm the transfer
             return interaction.reply({ content: `Successfully gave ${amount} credits to ${recipient.username}!`, ephemeral: true });
