@@ -23,7 +23,7 @@ module.exports = {
                 const lastClaim = results[0].last_claim ? moment(results[0].last_claim) : null;
                 const timeDifference = lastClaim ? moment().diff(lastClaim, 'hours') : 1;
 
-                if (timeDifference >= 1) {
+                if (timeDifference >= 0) {
                     // Update the balance and last claim time if the cooldown period has passed
                     await pool.query('UPDATE users SET balance = balance + 100000, last_claim = ? WHERE id = ?', [currentTime, userId]);
                     return interaction.reply({ content: 'You have successfully claimed 100000 tokens!', ephemeral: true });
