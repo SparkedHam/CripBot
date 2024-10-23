@@ -6,6 +6,7 @@ require('dotenv').config();
 const gameState = {};
 const pool = require('./utils/mysql');
 const { generateNewRadio } = require('./utils/radio.js');
+const cron = require('node-cron');
 
 console.log('Starting the bot...');
 
