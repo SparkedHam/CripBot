@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { generateNewRadio } = require('/utils/radio.js');
+const { generateNewRadio } = require('../utils/radio.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
