@@ -5,6 +5,7 @@ const connection = require('./utils/mysql');
 require('dotenv').config();
 const gameState = {};
 const pool = require('./utils/mysql');
+const { generateNewRadio } = require('./utils/radio.js');
 
 console.log('Starting the bot...');
 
@@ -45,6 +46,14 @@ client.login(process.env.DISCORD_TOKEN).catch(error => {
 
 client.once('ready', () => {
     console.log('Bot is Ready & Online!');
+
+    cron.schedule('0 0,6,12,18 * * *', () => {
+        console.log('Running scheduled task: generateNewRadio');
+        const footerText = 'Automated Change For Tsunami';
+        generateNewRadio(client, footerText);
+    }, {
+        timezone: "America/Chicago"
+    });
 
     // Set bot's status to appear online on a mobile device
     client.user.setPresence({
